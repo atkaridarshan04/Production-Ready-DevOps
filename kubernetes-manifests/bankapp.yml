@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bankapp-config
+  namespace: bankapp
+data:
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-statefulset-0.mysql-svc.bankapp.svc.cluster.local:3306/bankappdb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bankapp-secret
+  namespace: bankapp
+type: Opaque
+data:
+  SPRING_DATASOURCE_USERNAME: cm9vdA==        # Base64-encoded "root"
+  SPRING_DATASOURCE_PASSWORD: VGVzdEAxMjM=    # Base64-encoded "Test@123
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bankapp-svc
+  namespace: bankapp
+spec:
+  selector:
+    app: bankapp
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bankapp-deployment
+  namespace: bankapp
+  labels:
+    app: bankapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bankapp
+  template:
+    metadata:
+      name: bankapp
+      labels:
+        app: bankapp
+    spec:
+      securityContext:  
+        runAsUser: 1000 
+        runAsGroup: 3000  
+        fsGroup: 2000
+      containers:
+        - name: bankapp
+          image: atkaridarshan04/bankapp:v1
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: bankapp-secret
+                  key: SPRING_DATASOURCE_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bankapp-secret
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: bankapp-config
+                  key: SPRING_DATASOURCE_URL
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "0.25"
+            limits:
+              memory: "512Mi"
+              cpu: "0.5"
+          securityContext:  
+            runAsUser: 1000 
+            runAsGroup: 3000
+            allowPrivilegeEscalation: false  
+            capabilities:
+              drop:
+                - ALL 
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
