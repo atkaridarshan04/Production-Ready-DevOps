@@ -1,32 +1,75 @@
-# Production DevOps Deployment
+# Production Ready DevOps
 
-This project demonstrates a complete DevOps implementation for deploying a Java SpringBoot application on AWS EKS using Terraform, Docker, and Kubernetes.
+This project demonstrates a complete DevOps implementation for deploying a secure, scalable Java SpringBoot banking application on AWS EKS using Terraform, Docker, and Kubernetes.
 
 ## Project Overview
 
-This project demonstrates a production-ready deployment of a web application using modern DevOps practices and cloud-native technologies:
+This project showcases a production-ready deployment of a banking web application using modern DevOps practices and cloud-native technologies:
 
-- **Infrastructure**: Terraform-managed AWS resources including VPC, EKS.
-- **Containerization**: Docker images for the application.
-- **Orchestration**: Kubernetes manifests for all application components
-- **Storage**: EBS volumes for MySQL persistence
-- **Networking**: Ingress controller with TLS termination
-- **Scaling**: Horizontal Pod Autoscaler for dynamic scaling
-- **Monitoring**: Prometheus and Grafana for observability
+- **Infrastructure as Code**: Terraform-managed AWS resources including VPC, EKS, IAM roles, and security groups
+- **Containerization**: Multi-stage Docker builds for optimized, secure application images
+- **Orchestration**: Kubernetes manifests for all application components with proper security contexts
+- **Persistence**: StatefulSets with EBS volumes for MySQL database reliability
+- **Networking**: NGINX Ingress controller with TLS termination via Let's Encrypt
+- **Scaling**: Horizontal Pod Autoscaler for dynamic scaling based on CPU utilization
+- **Monitoring**: Prometheus and Grafana for comprehensive observability
+- **Security**: Proper secret management and network policies
 
 ## Prerequisites
 
-Before you begin, ensure you have the following tools installed:
+Before you begin, ensure you have the following tools installed and configured:
 
-- [AWS CLI](https://aws.amazon.com/cli/) - Configured with appropriate credentials
-- [Terraform](https://www.terraform.io/downloads.html) - v1.0.0 or newer
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) - For interacting with the Kubernetes cluster
-- [Helm](https://helm.sh/docs/intro/install/) - For installing Kubernetes applications
-- [eksctl](https://eksctl.io/installation/) - For additional EKS management
+| Tool | Version | Purpose |
+|------|---------|---------|  
+| [Terraform](https://www.terraform.io/downloads.html) | v1.0.0+ | Infrastructure as Code tool to provision AWS resources |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | Latest | Command-line tool for interacting with the Kubernetes cluster |
+| [Helm](https://helm.sh/docs/intro/install/) | v3.0.0+ | Package manager for Kubernetes to install applications |
+| [eksctl](https://eksctl.io/installation/) | Latest | Command-line tool for creating and managing EKS clusters |
+| [Docker](https://docs.docker.com/get-docker/) | Latest | For building and testing container images locally |
+
+
+## Security Best Practices
+
+This project implements several security best practices to ensure the application and infrastructure are protected:
+
+### Container Security
+
+- **Multi-stage Docker builds**: Minimizes attack surface by using separate build and runtime images
+- **Non-root users**: Application containers run as non-privileged users
+- **Read-only file systems**: When possible, containers use read-only file systems
+- **Resource limits**: All containers have CPU and memory limits defined
+- **Security contexts**: Pods and containers have proper security contexts configured
+
+### Kubernetes Security
+
+- **Secret management**: Sensitive data stored in Kubernetes Secrets (base64 encoded)
+- **Network policies**: Control traffic flow between pods (not shown in manifests but recommended)
+- **Pod security contexts**: Drop unnecessary capabilities and run as non-root
+- **Liveness and readiness probes**: Ensure proper application health monitoring
+
+### Infrastructure Security
+
+- **VPC isolation**: Application runs in a dedicated VPC with proper subnets
+- **Security groups**: Restrict network access to necessary ports only
+- **IAM roles**: Principle of least privilege for service accounts and roles
+- **TLS termination**: HTTPS traffic with certificates from Let's Encrypt
+
+### Database Security
+
+- **StatefulSet**: Ensures stable, predictable database deployment
+- **Secure credentials**: Database passwords stored in Kubernetes Secrets
+- **Resource isolation**: Dedicated resources for database workloads
 
 ## Deployment Guide
 
-### 1. Set up Terraform Backend (Optional but Recommended)
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/DevOps-Prod.git
+cd DevOps-Prod
+```
+
+### 2. Set up Terraform Backend (Optional but Recommended)
 
 Before initializing Terraform, set up a remote backend to store the Terraform state securely:
 
@@ -39,11 +82,20 @@ chmod +x ./scripts/setup-terraform-backend.sh
 ./scripts/setup-terraform-backend.sh
 ```
 
-### 2. Infrastructure Provisioning with Terraform
+**For Windows:**
+```powershell
+# Run the script using PowerShell
+& bash ./scripts/setup-terraform-backend.sh
+```
+
+### 3. Infrastructure Provisioning with Terraform
 
 Create the AWS infrastructure using Terraform:
 
 ```bash
+# Navigate to the terraform directory
+cd terraform
+
 # Initialize Terraform with the backend configuration
 terraform init
 
@@ -54,24 +106,24 @@ terraform plan
 terraform apply --auto-approve
 ```
 
-### 3. Configure kubectl to use the new EKS cluster
+### 4. Configure kubectl to use the new EKS cluster
 
 ```bash
-aws eks --region eu-north-1 update-kubeconfig --name prod-demo-cluster
+aws eks --region eu-north-1 update-kubeconfig --name eks-cluster
 ```
 
-### 4. Set up OIDC provider for EKS
+### 5. Set up OIDC provider for EKS
 
 ```bash
-eksctl utils associate-iam-oidc-provider --region eu-north-1 --cluster prod-demo-cluster --approve
+eksctl utils associate-iam-oidc-provider --region eu-north-1 --cluster eks-cluster --approve
 ```
 
-### 5. Create IAM service account for EBS CSI driver
+### 6. Create IAM service account for EBS CSI driver
 
 ```bash
 eksctl create iamserviceaccount \
   --region=eu-north-1 \
-  --cluster=prod-demo-cluster \
+  --cluster=eks-cluster \
   --namespace=kube-system \
   --name=ebs-csi-controller-sa \
   --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
@@ -79,128 +131,107 @@ eksctl create iamserviceaccount \
   --override-existing-service-accounts
 ```
 
-### 6. Install EBS CSI driver
+### 7. Install EBS CSI driver
 
 ```bash
 kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/ecr/?ref=release-1.11"
 ```
 
-### 7. Install NGINX Ingress Controller
+### 8. Install NGINX Ingress Controller
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
 ```
 
-### 8. Install cert-manager for SSL/TLS certificates
+### 9. Install cert-manager for SSL/TLS certificates
 
 ```bash
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.0/cert-manager.yaml
+
+# Apply the ClusterIssuer for Let's Encrypt
+kubectl apply -f kubernetes-manifests/cert-issuer.yml
 ```
 
-### 9. Create namespace for the application
+### 10. Create namespace and deploy the application
 
 ```bash
+# Create the namespace
 kubectl create namespace bankapp
+
+# Apply the storage class first
+kubectl apply -f kubernetes-manifests/storage.yml
+
+# Deploy MySQL database
+kubectl apply -f kubernetes-manifests/mysql.yml
+
+# Wait for MySQL to be ready
+kubectl wait --for=condition=ready pod -l app=mysql -n bankapp --timeout=120s
+
+# Deploy the banking application and related resources
+kubectl apply -f kubernetes-manifests/bankapp.yml
+kubectl apply -f kubernetes-manifests/hpa.yml
+kubectl apply -f kubernetes-manifests/ingress.yml
 ```
 
-### 10. Deploy the application
+### 11. Set up monitoring
 
 ```bash
-kubectl apply -f kubernetes/
+# Create monitoring namespace
+kubectl create namespace monitoring
+
+# Add Prometheus Helm repository
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# Install Prometheus and Grafana stack
+helm install monitoring prometheus-community/kube-prometheus-stack -f monitoring/values.yml -n monitoring
+
+# Expose services as LoadBalancer 
+kubectl patch svc monitoring-kube-prometheus-prometheus -n monitoring -p '{"spec": {"type": "LoadBalancer"}}'
+
+kubectl patch svc monitoring-grafana -n monitoring -p '{"spec": {"type": "LoadBalancer"}}'
 ```
 
-### 11. Access the application
+### 12. Access the application
 
 ```bash
 # Get the Ingress external IP/hostname
 kubectl get ingress -n bankapp
+
+# Get the Grafana service URL for monitoring
+kubectl get svc monitoring-grafana -n monitoring
 ```
 
-### 12. Clean up resources when done
+Access the banking application using the hostname configured in the ingress (you'll need to add an entry to your hosts file or configure a real domain to point to the ingress IP).
+
+Access Grafana at the external IP with default credentials:
+- Username: admin
+- Password: password (as configured in values.yml)
+
+To configure Grafana for monitoring:
+
+1. Navigate to the "Configuration" menu and select "Data Sources"
+2. Click "Add data source" and choose "Prometheus" from the list
+3. Enter the Prometheus server URL in the "URL" field
+4. Click "Save & Test" to verify the connection
+
+Once configured, you can access pre-built dashboards by:
+1. Going to the "Dashboards" section
+2. Selecting "Browse" to view all available dashboard templates
+3. Exploring the various pre-configured monitoring dashboards
+
+### 13. Clean up resources when done
 
 ```bash
-# Destroy all resources created by Terraform
+# Delete Kubernetes resources first
+kubectl delete namespace bankapp
+kubectl delete namespace monitoring
+
+# Navigate to terraform directory
+cd terraform
+
+# Destroy all AWS resources created by Terraform
 terraform destroy --auto-approve
 ```
 
-## Configuration
-
-### Terraform Backend
-
-The project uses an S3 bucket with DynamoDB for state locking to store the Terraform state securely. This allows for team collaboration and prevents state corruption. The configuration is in `terraform/backend.tf`.
-
-To customize the backend configuration:
-1. Edit the bucket name and DynamoDB table name in `terraform/backend.tf`
-2. Update the same values in the setup scripts in the `scripts/` directory
-
-## Scaling
-
-The application is configured with Horizontal Pod Autoscalers (HPA). The HPA will scale the number of pods based on CPU utilization:
-
-- Min replicas: 1
-- Max replicas: 5
-- Target CPU utilization: 70%
-
-## Storage
-
-The application uses AWS EBS volumes for persistent storage with the following configuration:
-
-- Storage Class: `ebs-sc` using the EBS CSI driver
-- Volume Type: gp3
-- File System: ext4
-- Reclaim Policy: Retain
-
-## Monitoring
-
-Add Prometheus and Grafana to provide observability for your Kubernetes cluster and applications.
-
-### Components
-
-- **Prometheus**: A time-series database for storing metrics
-- **Grafana**: A visualization tool for creating dashboards
-- **Node Exporter**: Collects hardware and OS metrics from Kubernetes nodes
-- **Kube State Metrics**: Provides metrics about the state of Kubernetes objects
-
-### Configuration
-
-The monitoring stack is configured in [monitoring/values.yml](./monitoring/values.yml) with the following settings:
-
-- Prometheus uses persistent storage (5Gi) with the `ebs-sc` StorageClass
-- Grafana is enabled and exposed via a LoadBalancer service
-- Node Exporter is configured to collect metrics from all nodes
-- Kube State Metrics is enabled to collect Kubernetes object metrics
-- Alertmanager is disabled (can be enabled if needed)
-
-### Deployment
-
-#### Add the Prometheus community Helm repository
-```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-```
-
-#### Install Prometheus and Grafana using the custom values file
-```bash
-helm install monitoring prometheus-community/kube-prometheus-stack -f monitoring/values.yml -n monitoring --create-namespace
-```
-
-#### Expose Serices
-```bash
-kubectl patch svc monitoring-kube-prometheus-prometheus -n monitoring -p '{"spec": {"type": "LoadBalancer"}}'
-
-kubectl patch svc monitoring-kube-state-metrics -n monitoring -p '{"spec": {"type": "LoadBalancer"}}'
-
-kubectl patch svc monitoring-prometheus-node-exporter -n monitoring -p '{"spec": {"type": "LoadBalancer"}}'
-```
-
-### Access the application
-```bash
-kubectl get svc -n monitoring
-```
-
-Go to graphana and add prometheus as data source , and save it.
-
-In dashboard section you will see pre-configured dashboards.
-
 ---
-
