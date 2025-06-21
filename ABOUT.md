@@ -1,5 +1,39 @@
 # Project Components
 
+This document provides detailed information about the various components and best practices implemented in this DevOps project.
+
+## Security Best Practices
+
+This project implements several security best practices to ensure the application and infrastructure are protected:
+
+### Container Security
+
+- **Multi-stage Docker builds**: Minimizes attack surface by using separate build and runtime images
+- **Non-root users**: Application containers run as non-privileged users
+- **Read-only file systems**: When possible, containers use read-only file systems
+- **Resource limits**: All containers have CPU and memory limits defined
+- **Security contexts**: Pods and containers have proper security contexts configured
+
+### Kubernetes Security
+
+- **Secret management**: Sensitive data stored in Kubernetes Secrets (base64 encoded)
+- **Network policies**: Control traffic flow between pods (not shown in manifests but recommended)
+- **Pod security contexts**: Drop unnecessary capabilities and run as non-root
+- **Liveness and readiness probes**: Ensure proper application health monitoring
+
+### Infrastructure Security
+
+- **VPC isolation**: Application runs in a dedicated VPC with proper subnets
+- **Security groups**: Restrict network access to necessary ports only
+- **IAM roles**: Principle of least privilege for service accounts and roles
+- **TLS termination**: HTTPS traffic with certificates from Let's Encrypt
+
+### Database Security
+
+- **StatefulSet**: Ensures stable, predictable database deployment
+- **Secure credentials**: Database passwords stored in Kubernetes Secrets
+- **Resource isolation**: Dedicated resources for database workloads
+
 ## Infrastructure Components
 
 ### Terraform Configuration
@@ -60,6 +94,28 @@ The application uses AWS EBS volumes for persistent storage with the following c
 - **File System**: ext4
 - **Reclaim Policy**: Retain (preserves data even after PVC deletion)
 - **Volume Binding Mode**: WaitForFirstConsumer (volumes are provisioned when pods are scheduled)
+
+## Secrets Management with HashiCorp Vault
+
+This project implements HashiCorp Vault for secure secrets management, providing a centralized solution for storing and accessing sensitive information.
+
+### Vault Architecture
+
+- **High Availability**: Deployed as a StatefulSet with multiple replicas for reliability
+- **Storage Backend**: Uses AWS EBS volumes for persistent storage of encrypted secrets
+- **Authentication**: Uses Kubernetes Service Account Token authentication
+
+### Key Features
+
+- **Dynamic Secrets**: Generates short-lived, on-demand database credentials
+- **Secret Versioning**: Maintains history of secrets with the KV v2 secrets engine
+- **Access Control**: Fine-grained policies control which applications can access specific secrets
+- **Audit Logging**: Records all access attempts for security compliance
+
+### Integration with Applications
+
+- **Vault Agent Injector**: Automatically injects secrets into pods as files or environment variables
+- **Service Account Binding**: Applications authenticate to Vault using their Kubernetes service account
 
 ## Monitoring and Observability
 

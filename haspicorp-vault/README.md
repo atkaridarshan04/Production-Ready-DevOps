@@ -1,6 +1,6 @@
 # HashiCorp Vault Setup Guide
 
-This guide provides step-by-step instructions for setting up HashiCorp Vault on Kubernetes with high availability configuration.
+This guide provides step-by-step instructions for setting up HashiCorp Vault on Kubernetes with high availability configuration for secure secrets management.
 
 ## Prerequisites
 - Kubernetes cluster with kubectl configured
@@ -49,7 +49,7 @@ This command will generate:
 - 5 unseal keys
 - 1 Initial Root Token
 
-> **IMPORTANT**: Copy and securely store these keys and the root token. They are required for unsealing Vault and administrative access.
+> **IMPORTANT**: Copy and securely store these keys and the root token. They are required for unsealing Vault and administrative access. Loss of these keys will result in permanent data loss.
 
 ### 7. Unseal Vault on All Pods
 
@@ -67,7 +67,7 @@ kubectl exec -n vault -it vault-1 -- vault operator unseal <key>
 kubectl exec -n vault -it vault-2 -- vault operator unseal <key>
 ```
 
-> Repeat for every with minimum 3 keys.
+> Repeat the unsealing process for each pod using a minimum of 3 different unseal keys.
 
 ### 8. Login To Vault
 ```bash
